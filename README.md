@@ -5,7 +5,7 @@
 </div>
 <h1 align=center>Adventures of Mana — Nintendo Switch port</h1>
 
-This is a wrapper/port of the Android version of *Adventure of Mana*
+This is a wrapper/port of the Android version of *Adventures of Mana*
 (`com.square_enix.adventures` 1.1.4). It loads the
 original game's native libraries and runs them inside a minimal emulated Android
 environment.
