@@ -1,9 +1,9 @@
 <div align=center>
 
-<img src="extras/banner.png" alt="Banner" width="35%">
+<img src="extras/banner.png" alt="Banner" width="40%">
 
 </div>
-<h1 align=center>Adventure of Mana — Nintendo Switch port</h1>
+<h1 align=center>Adventures of Mana — Nintendo Switch port</h1>
 
 This is a wrapper/port of the Android version of *Adventure of Mana*
 (`com.square_enix.adventures` 1.1.4). It loads the
@@ -47,12 +47,6 @@ Save data and the port's `config.txt` are stored in `/switch/aom/`.
 * `language` — selects localized text/assets, in MCF order:
   `0` ja, `1` en, `2` fr, `3` de, `4` it, `5` es, `6` ko, `7` zh_CN, `8` zh_TW.
   Defaults to English.
-
-### Controls
-
-Nintendo-native layout (A confirms, B cancels). D-pad and the left stick both
-drive movement; `L`/`R`/`ZL`/`ZR` map to the engine's L1/R1/L2/R2; `+`/`-` are
-Start/Select; the touchscreen maps to the game's touch input.
 
 ### How to build
 
