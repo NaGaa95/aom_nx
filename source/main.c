@@ -202,7 +202,7 @@ static void update_keys(void) {
   if (d & HidNpadButton_A) m |= 1 << AOM_BIT_A;
   if (d & HidNpadButton_B) m |= 1 << AOM_BIT_B;
   if (d & HidNpadButton_X) m |= 1 << AOM_BIT_A; // alt confirm
-  if (d & HidNpadButton_Y) m |= 1 << AOM_BIT_B; // alt cancel
+  if (d & HidNpadButton_Y) m |= 1 << AOM_BIT_Y; // submenu (game prompts Y)
   if (d & HidNpadButton_L) m |= 1 << AOM_BIT_L1;
   if (d & HidNpadButton_R) m |= 1 << AOM_BIT_R1;
   if (d & HidNpadButton_ZL) m |= 1 << AOM_BIT_L2;

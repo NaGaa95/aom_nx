@@ -13,7 +13,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 TARGET		:=	aom_nx
 APP_TITLE	:=	Adventure of Mana
 APP_AUTHOR	:=	naga
-APP_VERSION	:=	1.0.0
+APP_VERSION	:=	1.0.1
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data

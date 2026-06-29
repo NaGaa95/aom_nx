@@ -184,6 +184,7 @@ typedef struct Player {
   int rate;
   int playing;
   float gain; // linear, from SetVolumeLevel (millibels)
+  uint32_t frac; // 16.16 resampler phase
 
   slBufferQueueCallback cb;
   void *cb_ctx;
@@ -195,11 +196,10 @@ typedef struct Player {
   const uint8_t *cur;
   SLuint32 cur_size, cur_pos;
 
-  // underrun de-click: decay the last sample to silence instead of a hard cut,
-  // and ramp back in on resume (the single-threaded engine starves the queue
-  // during map loads, which would otherwise click on every music<->silence edge)
+  // underrun de-click: fade the last sample out instead of cutting, ramp back in
+  // on resume (the engine starves the queue during map loads)
   int32_t last_l, last_r;
-  int fade; // 0..FADE_LEN; <FADE_LEN means ramping back in after an underrun
+  int fade; // 0..FADE_LEN
 
   SDL_mutex *lock;
 } Player;
@@ -227,8 +227,11 @@ static SDL_mutex *g_reg_lock = NULL;
 #define FADE_LEN 256 // samples to fade out on underrun / in on resume
 
 static float mb_to_linear(SLmillibel mb) {
-  if (mb <= -9600) return 0.0f;
-  return powf(10.0f, (float)mb / 2000.0f); // 100 mB = 1 dB
+  // the engine encodes millibels as 8000*log10(linear), not the OpenSL 2000
+  // (decoding with 2000 gives gain^4 -> quiet sounds crushed, loud SFX dominate)
+  if (mb >= 0) return 1.0f;
+  if (mb <= -16000) return 0.0f;
+  return powf(10.0f, (float)mb / 8000.0f);
 }
 
 // mix one playing player into the S16 stereo accumulator (int32 to avoid clip).
@@ -242,6 +245,12 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
     return;
 
   const float g = p->gain;
+  const int fb = (p->channels >= 2) ? 4 : 2; // bytes per source frame
+  // 16.16 source frames per output frame (1.0 when the rates already match)
+  const uint32_t step = g_dev_rate > 0
+      ? (uint32_t)(((uint64_t)p->rate << 16) / (uint32_t)g_dev_rate)
+      : (1u << 16);
+
   for (int i = 0; i < frames; i++) {
     if (!p->cur || p->cur_pos >= p->cur_size) {
       // current buffer finished: notify the engine so it enqueues the next
@@ -260,9 +269,8 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
       }
       SDL_UnlockMutex(p->lock);
       if (!have) {
-        // underrun: decay the last sample to silence over FADE_LEN samples
-        // instead of an abrupt cut (avoids the click on every load stutter)
-        p->fade = 0; // resume will ramp back in
+        // underrun: fade out over FADE_LEN instead of cutting
+        p->fade = 0;
         for (int k = 0; i < frames; i++, k++) {
           int den = (k < FADE_LEN) ? (FADE_LEN - k) : 0;
           acc[i * 2 + 0] += p->last_l * den / FADE_LEN;
@@ -276,15 +284,12 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
       p->cur_pos = 0;
     }
 
+    // current source frame (nearest-neighbour)
     const int16_t *s = (const int16_t *)(p->cur + p->cur_pos);
     int32_t l, r;
-    if (p->channels >= 2) {
-      l = s[0]; r = s[1];
-      p->cur_pos += 4;
-    } else {
-      l = r = s[0];
-      p->cur_pos += 2;
-    }
+    if (p->channels >= 2) { l = s[0]; r = s[1]; }
+    else                  { l = r = s[0]; }
+
     int32_t ol = (int32_t)(l * g), orr = (int32_t)(r * g);
     if (p->fade < FADE_LEN) { // ramp in after an underrun
       ol = ol * p->fade / FADE_LEN;
@@ -295,6 +300,11 @@ static void mix_player(Player *p, int32_t *acc, int frames) {
     p->last_r = orr;
     acc[i * 2 + 0] += ol;
     acc[i * 2 + 1] += orr;
+
+    // advance the source by step
+    p->frac += step;
+    p->cur_pos += (p->frac >> 16) * fb;
+    p->frac &= 0xffff;
   }
 }
 
@@ -374,6 +384,7 @@ static SLresult bq_Clear(void *self) {
   p->q_head = p->q_tail = 0;
   p->cur = NULL;
   p->cur_pos = p->cur_size = 0;
+  p->frac = 0;
   SDL_UnlockMutex(p->lock);
   return SL_RESULT_SUCCESS;
 }

@@ -160,6 +160,31 @@ int unlinkat_fake(int dirfd, const char *path, int flags) {
 }
 
 int mkdir_fake(const char *path, int mode) { return mkdir(path, (mode_t)mode); }
+
+// Create a directory and any missing parents (like `mkdir -p`).
+static void mkdir_p(const char *path) {
+  char tmp[512];
+  int len = snprintf(tmp, sizeof(tmp), "%s", path);
+  if (len <= 0 || len >= (int)sizeof(tmp)) return;
+  while (len > 1 && (tmp[len - 1] == '/' || isspace((unsigned char)tmp[len - 1])))
+    tmp[--len] = 0; // trim trailing slash / whitespace
+  for (char *p = tmp + 1; *p; p++) {
+    if (*p == '/') { *p = 0; mkdir(tmp, 0777); *p = '/'; }
+  }
+  mkdir(tmp, 0777);
+}
+
+// The engine creates its save dir via system("mkdir <path>"); the Switch has no
+// shell, so emulate just that command (else the save fopen fails silently).
+int system_fake(const char *cmd) {
+  if (!cmd) return -1;
+  while (*cmd == ' ') cmd++;
+  if (strncmp(cmd, "mkdir ", 6) != 0) return -1;
+  const char *p = cmd + 6;
+  while (*p == ' ') p++;
+  mkdir_p(p);
+  return 0;
+}
 int ftruncate_fake(int fd, long length) { return ftruncate(fd, (off_t)length); }
 int truncate_fake(const char *path, long length) { return truncate(path, (off_t)length); }
 
@@ -367,10 +392,8 @@ void *AAssetManager_open_fake(void *mgr, const char *path, int mode) {
   if (!a) return NULL;
   a->f = open_asset(path, &a->size);
   if (!a->f) { free(a); return NULL; }
-  // Cache small assets (the BGM oggs etc.) wholly in RAM so their reads never
-  // touch the SD card. Otherwise BGM decode contends with map streaming from
-  // sk1.mpk during area loads and the audio underruns. sk1.mpk is far too big
-  // to cache and stays file-backed.
+  // cache small assets (BGM oggs) in RAM so their decode doesn't contend with
+  // map streaming off the SD during loads. sk1.mpk is too big -> file-backed.
   if (a->size > 0 && a->size <= 16 * 1024 * 1024) {
     a->mem = malloc(a->size);
     if (a->mem && fread(a->mem, 1, a->size, a->f) == a->size) {

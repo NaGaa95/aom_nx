@@ -36,7 +36,9 @@ So `/switch/aom/` should contain: `aom_nx.nro`, `libmcfandroid.so`,
 This will not work in applet/album mode. Use a game override (hold R on a title)
 or a forwarder.
 
-Save data and the port's `config.txt` are stored in `/switch/aom/`.
+The port's `config.txt` lives in the game folder, next to the NRO. Save data is
+created automatically on the SD card under `/data/data/com.square_enix.adventures/`
+(the engine manages its own save directory).
 
 ### Configuration
 

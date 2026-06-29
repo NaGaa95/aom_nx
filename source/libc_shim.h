@@ -43,6 +43,7 @@ int openat_fake(int dirfd, const char *path, int flags, ...);
 int __open_2_fake(const char *path, int flags);
 int unlinkat_fake(int dirfd, const char *path, int flags);
 int mkdir_fake(const char *path, int mode);
+int system_fake(const char *cmd);
 int ftruncate_fake(int fd, long length);
 int truncate_fake(const char *path, long length);
 void *fdopendir_fake(int fd);

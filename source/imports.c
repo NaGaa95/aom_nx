@@ -288,7 +288,7 @@ DynLibFunction dynlib_functions[] = {
   { "getenv", (uintptr_t)&getenv },
   { "setlocale", (uintptr_t)&setlocale },
   { "localeconv", (uintptr_t)&localeconv },
-  { "system", (uintptr_t)&retm1 },
+  { "system", (uintptr_t)&system_fake },
 
   // --- locale (_l variants: ignore the locale handle) -----------------------
   { "newlocale", (uintptr_t)&newlocale_fake },
