@@ -187,12 +187,7 @@ static FakeID *get_id(const char *name, const char *sig) {
 // ---------------------------------------------------------------------------
 
 static const char *device_language_string(void) {
-  static const char *langs[] = {
-    "ja", "en", "fr", "de", "it", "es", "ko", "zh_CN", "zh_TW"
-  };
-  const int n = (int)(sizeof(langs) / sizeof(*langs));
-  const int li = (config.language >= 0 && config.language < n) ? config.language : LANG_EN;
-  return langs[li];
+  return config.language == LANG_JA ? "ja" : "en";
 }
 
 // ---------------------------------------------------------------------------
@@ -295,14 +290,17 @@ static juint call_int(const char *name, va_list va) {
   return 0;
 }
 
+extern size_t g_native_heap; // actual engine heap size (set in __libnx_initheap)
+
 static juint call_long(const char *name, va_list va) {
   (void)va;
-  // memory queries: report a generous, fixed pool
+  // memory queries: report the real engine heap so the engine won't over-commit,
+  // and a generous device pool
   if (!strcmp(name, "funcDeviceMaxMemory"))   return 768ull * 1024 * 1024;
   if (!strcmp(name, "funcDeviceTotalMemory")) return 768ull * 1024 * 1024;
   if (!strcmp(name, "funcDeviceFreeMemory"))  return 384ull * 1024 * 1024;
-  if (!strcmp(name, "funcNativeTotalMemory")) return (juint)(MEMORY_MB * 1024ull * 1024);
-  if (!strcmp(name, "funcNativeFreeMemory"))  return (juint)(MEMORY_MB * 1024ull * 1024 / 2);
+  if (!strcmp(name, "funcNativeTotalMemory")) return (juint)g_native_heap;
+  if (!strcmp(name, "funcNativeFreeMemory"))  return (juint)(g_native_heap / 2);
   return 0;
 }
 

@@ -17,7 +17,8 @@
 #define CONFIG_VARS \
   CONFIG_VAR_INT(screen_width); \
   CONFIG_VAR_INT(screen_height); \
-  CONFIG_VAR_INT(language);
+  CONFIG_VAR_INT(language); \
+  CONFIG_VAR_INT(analog_stick);
 
 Config config;
 static int config_needs_rewrite = 0;
@@ -49,6 +50,7 @@ int read_config(const char *file) {
   config.screen_width = -1; // auto
   config.screen_height = -1;
   config.language = LANG_EN;
+  config.analog_stick = 0;
 
   FILE *f = fopen(file, "r");
   if (f == NULL)

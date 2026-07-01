@@ -7,8 +7,6 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#define MEMORY_MB 512
-
 // Engine module + its separately-linked NDK C++ runtime.
 #define SO_NAME     "libmcfandroid.so"
 #define CXX_SO_NAME "libc++_shared.so"
@@ -24,7 +22,7 @@
 extern int screen_width;
 extern int screen_height;
 
-// funcGetDeviceLanguage order: 0 ja 1 en 2 fr 3 de 4 it 5 es 6 ko 7 zh_CN 8 zh_TW
+// The game only ships Japanese and English data
 #define LANG_JA 0
 #define LANG_EN 1
 
@@ -32,6 +30,7 @@ typedef struct {
   int screen_width;
   int screen_height;
   int language;
+  int analog_stick; // 0 = 8-way, 1 = 360° analog
 } Config;
 
 extern Config config;

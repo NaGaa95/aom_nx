@@ -25,6 +25,7 @@
 
 static void *heap_so_base = NULL;
 static size_t heap_so_limit = 0;
+size_t g_native_heap = 0; // engine heap size, reported via funcNative*Memory
 
 so_module cxx_mod;   // libc++_shared.so
 so_module game_mod;  // libmcfandroid.so
@@ -52,7 +53,11 @@ void __libnx_initheap(void) {
 
   extern char *fake_heap_start;
   extern char *fake_heap_end;
-  fake_heap_size  = umin(size, MEMORY_MB * 1024 * 1024);
+  // Reserve a slice for the two .so images and give everything else to the
+  // newlib/engine heap.
+  const size_t so_reserve = 128 * 1024 * 1024;
+  fake_heap_size  = size > so_reserve * 2 ? size - so_reserve : size / 2;
+  g_native_heap   = fake_heap_size;
   fake_heap_start = (char *)addr;
   fake_heap_end   = (char *)addr + fake_heap_size;
 
@@ -192,6 +197,28 @@ static PadState pad;
 
 static AomInput s_input;
 
+// Map the left stick onto the on-screen floating joystick:
+static void update_stick_as_touch(void) {
+  static int engaged = 0;
+  if (!config.analog_stick) return;                      // toggled off (default)
+  if (s_input.touch_count > 0) { engaged = 0; return; } // real finger wins
+  HidAnalogStickState l = padGetStickPos(&pad, 0);
+  float lx = l.x / 32767.0f, ly = l.y / 32767.0f;
+  if (lx * lx + ly * ly < 0.20f * 0.20f) { engaged = 0; return; } // deadzone
+
+  const int ox = screen_width / 4, oy = screen_height * 2 / 3; // joystick origin
+  const int rad = screen_height / 4;
+  if (!engaged) {                  // press at the origin (the drag start)
+    s_input.touch[0].x = ox;
+    s_input.touch[0].y = oy;
+    engaged = 1;
+  } else {                         // drag by the deflection (screen Y is down)
+    s_input.touch[0].x = ox + (int)(lx * rad);
+    s_input.touch[0].y = oy - (int)(ly * rad);
+  }
+  s_input.touch_count = 1;
+}
+
 static void update_keys(void) {
   padUpdate(&pad);
   const u64 d = padGetButtons(&pad);
@@ -211,10 +238,16 @@ static void update_keys(void) {
   if (d & HidNpadButton_StickR) m |= 1 << AOM_BIT_R3;
   if (d & HidNpadButton_Plus)  m |= 1 << AOM_BIT_X;      // pause menu
   if (d & HidNpadButton_Minus) m |= 1 << AOM_BIT_SELECT;
-  if (d & (HidNpadButton_Up    | HidNpadButton_StickLUp))    m |= 1 << AOM_BIT_UP;
-  if (d & (HidNpadButton_Down  | HidNpadButton_StickLDown))  m |= 1 << AOM_BIT_DOWN;
-  if (d & (HidNpadButton_Left  | HidNpadButton_StickLLeft))  m |= 1 << AOM_BIT_LEFT;
-  if (d & (HidNpadButton_Right | HidNpadButton_StickLRight)) m |= 1 << AOM_BIT_RIGHT;
+  u64 dirs = d;
+  if (!config.analog_stick)
+    dirs |= (d & HidNpadButton_StickLUp    ? HidNpadButton_Up    : 0)
+          | (d & HidNpadButton_StickLDown  ? HidNpadButton_Down  : 0)
+          | (d & HidNpadButton_StickLLeft  ? HidNpadButton_Left  : 0)
+          | (d & HidNpadButton_StickLRight ? HidNpadButton_Right : 0);
+  if (dirs & HidNpadButton_Up)    m |= 1 << AOM_BIT_UP;
+  if (dirs & HidNpadButton_Down)  m |= 1 << AOM_BIT_DOWN;
+  if (dirs & HidNpadButton_Left)  m |= 1 << AOM_BIT_LEFT;
+  if (dirs & HidNpadButton_Right) m |= 1 << AOM_BIT_RIGHT;
 
   s_input.key_now = m;
 }
@@ -317,6 +350,7 @@ int main(void) {
   while (appletMainLoop() && !jni_quit_requested) {
     update_keys();
     update_touch();
+    update_stick_as_touch(); // analog stick -> virtual-joystick touch (360°)
 
     void *sensor = jni_build_sensor_array(&s_input);
     e_pushSensor(fake_env, thiz_class, sensor);

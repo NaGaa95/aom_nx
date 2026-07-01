@@ -46,9 +46,10 @@ created automatically on the SD card under `/data/data/com.square_enix.adventure
 
 * `screen_width` / `screen_height` — render resolution; `-1` picks 1280x720
   handheld and 1920x1080 docked.
-* `language` — selects localized text/assets, in MCF order:
-  `0` ja, `1` en, `2` fr, `3` de, `4` it, `5` es, `6` ko, `7` zh_CN, `8` zh_TW.
-  Defaults to English.
+* `language` — `0` Japanese, `1` English (default).
+* `analog_stick` — `0` (default) treats the left stick as the d-pad (8 axis);
+  `1` enables full 360° movement by driving the game's virtual joystick (which
+  also shows its on-screen touch cursor).
 
 ### How to build
 
