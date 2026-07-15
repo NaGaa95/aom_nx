@@ -48,8 +48,9 @@ or a forwarder.
 
 * Left stick — native 360° movement; d-pad — digital movement/menu navigation.
 * A — attack/confirm; B — equipped item or magic/cancel.
-* X — talk to or use the current companion's ability.
+* X, L+X, or R+X — talk to or use the current companion's ability.
 * Y or Plus — open the ring/pause menu.
+* L+R — open the map.
 * Hold L or R and press Y, B, or A — use shortcut 1, 2, or 3 respectively.
 
 ### How to build
