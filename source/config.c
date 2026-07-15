@@ -17,8 +17,7 @@
 #define CONFIG_VARS \
   CONFIG_VAR_INT(screen_width); \
   CONFIG_VAR_INT(screen_height); \
-  CONFIG_VAR_INT(language); \
-  CONFIG_VAR_INT(analog_stick);
+  CONFIG_VAR_INT(language);
 
 Config config;
 static int config_needs_rewrite = 0;
@@ -28,7 +27,8 @@ int screen_width = 1280;
 int screen_height = 720;
 
 static inline void parse_var(const char *name, const char *value) {
-  if (!strcmp(name, "touchscreen") || !strcmp(name, "controller_cursor") || !strcmp(name, "show_fps")) {
+  if (!strcmp(name, "touchscreen") || !strcmp(name, "controller_cursor") ||
+      !strcmp(name, "show_fps") || !strcmp(name, "analog_stick")) {
     config_needs_rewrite = 1;
     return;
   }
@@ -50,7 +50,6 @@ int read_config(const char *file) {
   config.screen_width = -1; // auto
   config.screen_height = -1;
   config.language = LANG_EN;
-  config.analog_stick = 0;
 
   FILE *f = fopen(file, "r");
   if (f == NULL)

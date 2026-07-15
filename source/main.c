@@ -7,6 +7,7 @@
  */
 
 #include <stdlib.h>
+#include <math.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -22,6 +23,7 @@
 #include "jni_fake.h"
 #include "gfx.h"
 #include "opensles.h"
+#include "save_path.h"
 
 static void *heap_so_base = NULL;
 static size_t heap_so_limit = 0;
@@ -197,59 +199,57 @@ static PadState pad;
 
 static AomInput s_input;
 
-// Map the left stick onto the on-screen floating joystick:
-static void update_stick_as_touch(void) {
-  static int engaged = 0;
-  if (!config.analog_stick) return;                      // toggled off (default)
-  if (s_input.touch_count > 0) { engaged = 0; return; } // real finger wins
-  HidAnalogStickState l = padGetStickPos(&pad, 0);
-  float lx = l.x / 32767.0f, ly = l.y / 32767.0f;
-  if (lx * lx + ly * ly < 0.20f * 0.20f) { engaged = 0; return; } // deadzone
+#define SWITCH_STICK_MAX 32768.0f
+#define STICK_DEADZONE   0.15f
 
-  const int ox = screen_width / 4, oy = screen_height * 2 / 3; // joystick origin
-  const int rad = screen_height / 4;
-  if (!engaged) {                  // press at the origin (the drag start)
-    s_input.touch[0].x = ox;
-    s_input.touch[0].y = oy;
-    engaged = 1;
-  } else {                         // drag by the deflection (screen Y is down)
-    s_input.touch[0].x = ox + (int)(lx * rad);
-    s_input.touch[0].y = oy - (int)(ly * rad);
+static void update_sticks(void) {
+  const HidAnalogStickState l = padGetStickPos(&pad, 0);
+  float x = l.x / SWITCH_STICK_MAX;
+  float y = l.y / SWITCH_STICK_MAX;
+  const float magnitude = sqrtf(x * x + y * y);
+
+  if (magnitude <= STICK_DEADZONE) {
+    x = 0.0f;
+    y = 0.0f;
+  } else {
+    const float clamped = magnitude < 1.0f ? magnitude : 1.0f;
+    const float scale = (clamped - STICK_DEADZONE)
+                      / ((1.0f - STICK_DEADZONE) * magnitude);
+    x *= scale;
+    y *= scale;
   }
-  s_input.touch_count = 1;
+
+  // MCFLib uses libnx's horizontal direction but screen-style vertical input.
+  s_input.gamepad_stick_x[0] = (int)lroundf(x * AOM_GAMEPAD_AXIS_MAX);
+  s_input.gamepad_stick_y[0] = (int)lroundf(-y * AOM_GAMEPAD_AXIS_MAX);
 }
 
 static void update_keys(void) {
   padUpdate(&pad);
   const u64 d = padGetButtons(&pad);
   int m = 0;
-  // Nintendo-native: A (right) confirms, B (bottom) cancels.
-  // The engine opens the pause menu on the X bit (bit 6), so we put that on
-  // Plus (+) and free the X/Y face buttons to act as alternate confirm/cancel.
+  // The game's native companion/ASK action is L1+X (matching L+Square on
+  // Vita). Make it a direct Switch X action; plain game X and Y both open the
+  // ring/pause controls.
   if (d & HidNpadButton_A) m |= 1 << AOM_BIT_A;
   if (d & HidNpadButton_B) m |= 1 << AOM_BIT_B;
-  if (d & HidNpadButton_X) m |= 1 << AOM_BIT_A; // alt confirm
-  if (d & HidNpadButton_Y) m |= 1 << AOM_BIT_Y; // submenu (game prompts Y)
+  if (d & HidNpadButton_X) m |= (1 << AOM_BIT_L1) | (1 << AOM_BIT_X);
+  if (d & HidNpadButton_Y) m |= 1 << AOM_BIT_Y;
   if (d & HidNpadButton_L) m |= 1 << AOM_BIT_L1;
   if (d & HidNpadButton_R) m |= 1 << AOM_BIT_R1;
   if (d & HidNpadButton_ZL) m |= 1 << AOM_BIT_L2;
   if (d & HidNpadButton_ZR) m |= 1 << AOM_BIT_R2;
   if (d & HidNpadButton_StickL) m |= 1 << AOM_BIT_L3;
   if (d & HidNpadButton_StickR) m |= 1 << AOM_BIT_R3;
-  if (d & HidNpadButton_Plus)  m |= 1 << AOM_BIT_X;      // pause menu
+  if (d & HidNpadButton_Plus)  m |= 1 << AOM_BIT_X; // ring/pause menu alias
   if (d & HidNpadButton_Minus) m |= 1 << AOM_BIT_SELECT;
-  u64 dirs = d;
-  if (!config.analog_stick)
-    dirs |= (d & HidNpadButton_StickLUp    ? HidNpadButton_Up    : 0)
-          | (d & HidNpadButton_StickLDown  ? HidNpadButton_Down  : 0)
-          | (d & HidNpadButton_StickLLeft  ? HidNpadButton_Left  : 0)
-          | (d & HidNpadButton_StickLRight ? HidNpadButton_Right : 0);
-  if (dirs & HidNpadButton_Up)    m |= 1 << AOM_BIT_UP;
-  if (dirs & HidNpadButton_Down)  m |= 1 << AOM_BIT_DOWN;
-  if (dirs & HidNpadButton_Left)  m |= 1 << AOM_BIT_LEFT;
-  if (dirs & HidNpadButton_Right) m |= 1 << AOM_BIT_RIGHT;
+  if (d & HidNpadButton_Up)    m |= 1 << AOM_BIT_UP;
+  if (d & HidNpadButton_Down)  m |= 1 << AOM_BIT_DOWN;
+  if (d & HidNpadButton_Left)  m |= 1 << AOM_BIT_LEFT;
+  if (d & HidNpadButton_Right) m |= 1 << AOM_BIT_RIGHT;
 
   s_input.key_now = m;
+  update_sticks();
 }
 
 static void update_touch(void) {
@@ -272,6 +272,10 @@ static void update_touch(void) {
 
 int main(void) {
   cpu_boost(1);
+
+  /* Existing releases stored saves under /data/data.  Move them before the
+   * engine starts so an update transparently continues the same save. */
+  migrate_legacy_saves();
 
   if (read_config(CONFIG_NAME) != 0)
     write_config(CONFIG_NAME);
@@ -330,12 +334,14 @@ int main(void) {
   if (e_JNI_OnLoad)
     e_JNI_OnLoad(fake_vm, NULL);
 
-  // MainActivity.JniConstruct(activity, downloadPath, assetManager)
+  // JniConstruct takes the Android package name; the download path is set by
+  // the separate setDownloadPath entry point.
+  void *package_name = jni_make_string(SAVE_PACKAGE_NAME);
   void *download_path = jni_make_string(".");
   void *asset_mgr = jni_make_asset_manager();
   if (e_setDownloadPath)
     e_setDownloadPath(fake_env, thiz_class, download_path);
-  e_JniConstruct(fake_env, thiz_class, thiz_activity, download_path, asset_mgr);
+  e_JniConstruct(fake_env, thiz_class, thiz_activity, package_name, asset_mgr);
 
   e_JniOnStart(fake_env, thiz_class);
   e_JniOnResume(fake_env, thiz_class);
@@ -350,7 +356,6 @@ int main(void) {
   while (appletMainLoop() && !jni_quit_requested) {
     update_keys();
     update_touch();
-    update_stick_as_touch(); // analog stick -> virtual-joystick touch (360°)
 
     void *sensor = jni_build_sensor_array(&s_input);
     e_pushSensor(fake_env, thiz_class, sensor);

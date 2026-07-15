@@ -587,6 +587,9 @@ void jni_init(void) {
 //   [7]touch_now [8]touch_last [9]touch_on [10]touch_off [11]moving [12]move
 //   [13]touch_max_x [14]touch_max_y
 //   start_x[0..3]=[15..18] start_y=[19..22] move_x=[23..26] move_y=[27..30]
+//   stick_x[0..1]=[31..32] stick_y=[33..34] analog_button=[35..36]
+// The engine converts the six gamepad values to floats by multiplying by
+// 1.0f/AOM_GAMEPAD_AXIS_MAX before passing them to GPadLib.
 // Edges are derived here (Java did this in updateInput()).
 // ---------------------------------------------------------------------------
 
@@ -639,6 +642,14 @@ void *jni_build_sensor_array(const AomInput *in) {
   a[19] = start_y;   // start_y[0]
   a[23] = cx;        // move_x[0]  (read by the engine on press/move/RELEASE)
   a[27] = cy;        // move_y[0]
+
+  if (in) {
+    for (int i = 0; i < 2; i++) {
+      a[31 + i] = in->gamepad_stick_x[i];
+      a[33 + i] = in->gamepad_stick_y[i];
+      a[35 + i] = in->gamepad_analog_button[i];
+    }
+  }
 
   key_last = key_now;
   touch_last = down;

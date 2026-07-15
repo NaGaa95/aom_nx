@@ -30,7 +30,6 @@ typedef struct {
   int screen_width;
   int screen_height;
   int language;
-  int analog_stick; // 0 = 8-way, 1 = 360° analog
 } Config;
 
 extern Config config;

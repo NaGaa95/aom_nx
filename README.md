@@ -36,10 +36,6 @@ So `/switch/aom/` should contain: `aom_nx.nro`, `libmcfandroid.so`,
 This will not work in applet/album mode. Use a game override (hold R on a title)
 or a forwarder.
 
-The port's `config.txt` lives in the game folder, next to the NRO. Save data is
-created automatically on the SD card under `/data/data/com.square_enix.adventures/`
-(the engine manages its own save directory).
-
 ### Configuration
 
 `config.txt` is created on first run:
@@ -47,9 +43,14 @@ created automatically on the SD card under `/data/data/com.square_enix.adventure
 * `screen_width` / `screen_height` — render resolution; `-1` picks 1280x720
   handheld and 1920x1080 docked.
 * `language` — `0` Japanese, `1` English (default).
-* `analog_stick` — `0` (default) treats the left stick as the d-pad (8 axis);
-  `1` enables full 360° movement by driving the game's virtual joystick (which
-  also shows its on-screen touch cursor).
+
+### Controls
+
+* Left stick — native 360° movement; d-pad — digital movement/menu navigation.
+* A — attack/confirm; B — equipped item or magic/cancel.
+* X — talk to or use the current companion's ability.
+* Y or Plus — open the ring/pause menu.
+* Hold L or R and press Y, B, or A — use shortcut 1, 2, or 3 respectively.
 
 ### How to build
 

@@ -29,6 +29,7 @@
 #include <switch.h>
 
 #include "config.h"
+#include "save_path.h"
 #include "util.h"
 #include "libc_shim.h"
 
@@ -124,6 +125,7 @@ long pathconf_fake(const char *path, int name) { (void)path; (void)name; return 
 #define LINUX_O_EXCL   0200
 #define LINUX_O_TRUNC  01000
 #define LINUX_O_APPEND 02000
+#define REDIRECTED_PATH_MAX 512
 
 static int convert_open_flags(int flags) {
   int out = flags & 3;
@@ -135,31 +137,63 @@ static int convert_open_flags(int flags) {
 }
 
 int open_fake(const char *path, int flags, ...) {
+  char redirected[REDIRECTED_PATH_MAX];
   int mode = 0666;
   if (flags & LINUX_O_CREAT) {
     va_list va; va_start(va, flags); mode = va_arg(va, int); va_end(va);
   }
+  path = save_redirect_path(path, redirected, sizeof(redirected));
   return open(path, convert_open_flags(flags), mode);
 }
 
 int openat_fake(int dirfd, const char *path, int flags, ...) {
+  char redirected[REDIRECTED_PATH_MAX];
   (void)dirfd;
   int mode = 0666;
   if (flags & LINUX_O_CREAT) {
     va_list va; va_start(va, flags); mode = va_arg(va, int); va_end(va);
   }
+  path = save_redirect_path(path, redirected, sizeof(redirected));
   return open(path, convert_open_flags(flags), mode);
 }
 
 int __open_2_fake(const char *path, int flags) {
+  char redirected[REDIRECTED_PATH_MAX];
+  path = save_redirect_path(path, redirected, sizeof(redirected));
   return open(path, convert_open_flags(flags), 0666);
 }
 
 int unlinkat_fake(int dirfd, const char *path, int flags) {
-  (void)dirfd; (void)flags; return unlink(path);
+  char redirected[REDIRECTED_PATH_MAX];
+  (void)dirfd; (void)flags;
+  path = save_redirect_path(path, redirected, sizeof(redirected));
+  return unlink(path);
 }
 
-int mkdir_fake(const char *path, int mode) { return mkdir(path, (mode_t)mode); }
+int mkdir_fake(const char *path, int mode) {
+  char redirected[REDIRECTED_PATH_MAX];
+  path = save_redirect_path(path, redirected, sizeof(redirected));
+  return mkdir(path, (mode_t)mode);
+}
+
+int remove_fake(const char *path) {
+  char redirected[REDIRECTED_PATH_MAX];
+  path = save_redirect_path(path, redirected, sizeof(redirected));
+  return remove(path);
+}
+
+int rename_fake(const char *old_path, const char *new_path) {
+  char old_redirected[REDIRECTED_PATH_MAX], new_redirected[REDIRECTED_PATH_MAX];
+  old_path = save_redirect_path(old_path, old_redirected, sizeof(old_redirected));
+  new_path = save_redirect_path(new_path, new_redirected, sizeof(new_redirected));
+  return rename(old_path, new_path);
+}
+
+void *opendir_fake(const char *path) {
+  char redirected[REDIRECTED_PATH_MAX];
+  path = save_redirect_path(path, redirected, sizeof(redirected));
+  return opendir(path);
+}
 
 // Create a directory and any missing parents (like `mkdir -p`).
 static void mkdir_p(const char *path) {
@@ -182,11 +216,17 @@ int system_fake(const char *cmd) {
   if (strncmp(cmd, "mkdir ", 6) != 0) return -1;
   const char *p = cmd + 6;
   while (*p == ' ') p++;
+  char redirected[REDIRECTED_PATH_MAX];
+  p = save_redirect_path(p, redirected, sizeof(redirected));
   mkdir_p(p);
   return 0;
 }
 int ftruncate_fake(int fd, long length) { return ftruncate(fd, (off_t)length); }
-int truncate_fake(const char *path, long length) { return truncate(path, (off_t)length); }
+int truncate_fake(const char *path, long length) {
+  char redirected[REDIRECTED_PATH_MAX];
+  path = save_redirect_path(path, redirected, sizeof(redirected));
+  return truncate(path, (off_t)length);
+}
 
 // fdopendir is not in devkitA64 newlib; libc++ imports it for std::filesystem,
 // which the game never exercises.
@@ -219,7 +259,9 @@ static void convert_stat(const struct stat *in, struct bionic_stat *out) {
 }
 
 int stat_fake(const char *path, struct bionic_stat *st) {
+  char redirected[REDIRECTED_PATH_MAX];
   struct stat real;
+  path = save_redirect_path(path, redirected, sizeof(redirected));
   int ret = stat(path, &real);
   if (ret == 0) convert_stat(&real, st);
   return ret;
@@ -299,6 +341,8 @@ int posix_memalign_fake(void **out, size_t align, size_t size) {
 }
 
 char *realpath_fake(const char *path, char *resolved) {
+  char redirected[REDIRECTED_PATH_MAX];
+  path = save_redirect_path(path, redirected, sizeof(redirected));
   if (!resolved) resolved = malloc(0x1000);
   strcpy(resolved, path);
   return resolved;
@@ -377,6 +421,8 @@ static FILE *open_asset(const char *name, size_t *out_size) {
 
 // buffered fopen for the big game archives
 FILE *fopen_fake(const char *path, const char *mode) {
+  char redirected[REDIRECTED_PATH_MAX];
+  path = save_redirect_path(path, redirected, sizeof(redirected));
   FILE *f = fopen(path, mode);
   if (f && strchr(mode, 'r')) {
     const char *ext = strrchr(path, '.');

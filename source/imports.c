@@ -400,8 +400,8 @@ DynLibFunction dynlib_functions[] = {
   { "vfprintf", (uintptr_t)&vfprintf_fake },
   { "tmpfile", (uintptr_t)&tmpfile },
   { "tmpnam", (uintptr_t)&tmpnam },
-  { "remove", (uintptr_t)&remove },
-  { "rename", (uintptr_t)&rename },
+  { "remove", (uintptr_t)&remove_fake },
+  { "rename", (uintptr_t)&rename_fake },
 
   // --- low-level fs (raw fds) -----------------------------------------------
   { "open", (uintptr_t)&open_fake },
@@ -414,7 +414,7 @@ DynLibFunction dynlib_functions[] = {
   { "fstat", (uintptr_t)&fstat_fake },
   { "lstat", (uintptr_t)&lstat_fake },
   { "mkdir", (uintptr_t)&mkdir_fake },
-  { "opendir", (uintptr_t)&opendir },
+  { "opendir", (uintptr_t)&opendir_fake },
   { "fdopendir", (uintptr_t)&fdopendir_fake },
   { "readdir", (uintptr_t)&readdir_fake },
   { "closedir", (uintptr_t)&closedir },

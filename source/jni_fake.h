@@ -31,6 +31,7 @@ enum {
 };
 
 #define AOM_MAX_TOUCH 4
+#define AOM_GAMEPAD_AXIS_MAX 4096
 
 // per-frame input snapshot, pushed to the engine via pushSensor()
 typedef struct {
@@ -38,6 +39,9 @@ typedef struct {
   int touch_max_x, touch_max_y;
   int touch_count;
   struct { int x, y; } touch[AOM_MAX_TOUCH];
+  int gamepad_stick_x[2]; // signed MCFLib axes, -4096..4096
+  int gamepad_stick_y[2];
+  int gamepad_analog_button[2];
 } AomInput;
 
 // build the MCFLib_Sensor int[] from `in`; returns the jintArray for pushSensor()
