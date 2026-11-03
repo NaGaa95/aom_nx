@@ -39,6 +39,9 @@ LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*
 # (runtime-built shaders, mcfsidraw.cpp), so we link mesa libGLESv2 + EGL.
 # FreeType + libpng implement funcFontDrawStringToImage; zlib is used by both
 # the engine (mpk inflate) and our shims. No video libs: AoM has no FMV.
+# Publish all EGL presentation paths, including guest import tables.
+LDFLAGS += -Wl,--wrap=eglSwapBuffers,--wrap=eglGetProcAddress,--wrap=__libnx_exit
+
 LIBS	:= -lSDL2 -lGLESv2 -lEGL -lglapi -ldrm_nouveau \
 			-Wl,--start-group -lfreetype -lharfbuzz -Wl,--end-group \
 			-lpng -lbz2 -lz -lnx -lm

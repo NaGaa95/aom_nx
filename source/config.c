@@ -27,8 +27,7 @@ int screen_width = 1280;
 int screen_height = 720;
 
 static inline void parse_var(const char *name, const char *value) {
-  if (!strcmp(name, "touchscreen") || !strcmp(name, "controller_cursor") ||
-      !strcmp(name, "show_fps") || !strcmp(name, "analog_stick")) {
+  if (!strcmp(name, "touchscreen") || !strcmp(name, "controller_cursor") || !strcmp(name, "analog_stick")) {
     config_needs_rewrite = 1;
     return;
   }
